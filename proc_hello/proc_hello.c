@@ -4,37 +4,63 @@
 #include <linux/uaccess.h>
 
 #define HELLO_PROC_ENTRY "hello"
+#define MAX_DATA_SIZE 4096
 
 // 1. proc file entry
 // 2. proc_read_entry
 
-char data[4096];
+char data[MAX_DATA_SIZE];
 char pos;
 
 ssize_t proc_hello_write(struct file *file, const char __user *buf, size_t sz, loff_t *off)
 {
-	if (copy_from_user(data+pos, buf, sz)) {
+	size_t wsz = 0;
+
+	if (*off < 0 || sz <= 0) {
 		return -EFAULT;
 	}
 
-	*off += sz;
-	pos += sz;
-	return sz;
-}
+	wsz = MAX_DATA_SIZE - *off;
+	if (wsz <= 0) {
+		return -ENOMEM;
+	}
 
+	if (wsz > sz) {
+		wsz = sz;
+	}
+
+	if (copy_from_user(data+(*off), buf, wsz)) {
+		return -EFAULT;
+	}
+
+	*off += wsz;
+	pos = *off;
+	return wsz;
+}
 
 ssize_t proc_hello_read(struct file * file, char __user *buf, size_t sz, loff_t *off)
 {
-	if (*off > 0) {
-		return 0;
-	}
+	size_t rsz = 0;
 
-	if (copy_to_user(buf, data, pos)) {
+	if (*off < 0 || sz <= 0) {
 		return -EFAULT;
 	}
 
-	*off += pos;
-	return pos;
+	rsz = pos - *off;
+	if (rsz <= 0) {
+		return 0;
+	}
+
+	if (rsz > sz) {
+		rsz = sz;
+	}
+
+	if (copy_to_user(buf, data+(*off), rsz)) {
+		return -EFAULT;
+	}
+
+	*off += rsz;
+	return rsz;
 }
 
 struct file_operations proc_hello_fops = {
