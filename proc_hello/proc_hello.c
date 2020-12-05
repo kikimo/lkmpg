@@ -11,30 +11,41 @@
 char data[4096];
 char pos;
 
+ssize_t proc_hello_write(struct file *file, const char __user *buf, size_t sz, loff_t *off)
+{
+	if (copy_from_user(data+pos, buf, sz)) {
+		return -EFAULT;
+	}
+
+	*off += sz;
+	pos += sz;
+	return sz;
+}
+
+
 ssize_t proc_hello_read(struct file * file, char __user *buf, size_t sz, loff_t *off)
 {
-    char *greeting = "hello world\n";
-    ssize_t len = strlen(greeting);
-    
-    if (*off > 0) {
-        return 0;
-    }
+	if (*off > 0) {
+		return 0;
+	}
 
-    if (copy_to_user(buf, greeting, len)) {
-        return -EFAULT;
-    }
+	if (copy_to_user(buf, data, pos)) {
+		return -EFAULT;
+	}
 
-    *off = len;
-
-    return len;
+	*off += pos;
+	return pos;
 }
 
 struct file_operations proc_hello_fops = {
+    .owner = THIS_MODULE,
     .read = proc_hello_read,
+    .write = proc_hello_write,
 };
+
 struct proc_dir_entry *proc_hello_ent;
 
-static int __init init_hello_proc(void)
+static int __init proc_hello_init(void)
 {
     printk(KERN_INFO "proc hello init.\n");
 
@@ -46,7 +57,7 @@ static int __init init_hello_proc(void)
     return 0;
 }
 
-static void __exit cleanup_hello_proc(void)
+static void __exit proc_hello_exit(void)
 {
     printk(KERN_INFO "proc hello exit.\n");
 
@@ -57,5 +68,5 @@ static void __exit cleanup_hello_proc(void)
     return;
 }
 
-module_init(init_hello_proc);
-module_exit(cleanup_hello_proc);
+module_init(proc_hello_init);
+module_exit(proc_hello_exit);
